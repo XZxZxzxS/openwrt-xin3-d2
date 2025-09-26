@@ -1,0 +1,51 @@
+name: Build OpenWrt for New3 D2
+
+on:
+  workflow_dispatch:
+    # 允许手动触发
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential ccache ecj fastjar file g++ gawk \
+            gettext git java-propose-classpath libelf-dev libncurses5-dev \
+            libncursesw5-dev libssl-dev python3 python3-distutils unzip wget \
+            python3-pyelftools rsync subversion swig time xsltproc zlib1g-dev
+
+      - name: Clone OpenWrt
+        run: |
+          git clone https://github.com/openwrt/openwrt.git
+          cd openwrt
+          echo "src-git homeproxy https://github.com/sbwml/luci-app-homeproxy.git" >> feeds.conf.default
+          echo "src-git ddnsgo https://github.com/sirpdboy/luci-app-ddns-go.git" >> feeds.conf.default
+          echo "src-git uhttpd https://github.com/sbwml/luci-app-uhttpd.git" >> feeds.conf.default
+          echo "src-git openlist2 https://github.com/sbwml/openwrt-openlist.git" >> feeds.conf.default
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall-packages.git" >> feeds.conf.default
+          echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2.git" >> feeds.conf.default
+
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          cp ../xin3-d2.config .config
+          make defconfig
+
+      - name: Build
+        run: |
+          cd openwrt
+          make -j$(nproc) V=s
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v3
+        with:
+          name: openwrt-new3-d2
+          path: openwrt/bin/targets/
